@@ -2,6 +2,9 @@
 
 #include "ofMain.h"
 #include "ofxJSONElement.h"
+#include "ofxXmlPoco.h"
+
+using namespace std;
 
 class ofxYouTubeURLEvent;
 
@@ -45,12 +48,8 @@ class ofxThreadedYouTubeVideo : public ofThread
 
         ofxJSONElement  response;
 
-
-    	int                 nextID;
-        Poco::Condition     condition;
-        int                 lastUpdate;
-
-    	deque<ofYouTubeLoaderEntry> urls_to_load_buffer;
+        //deque<ofYouTubeLoaderEntry> urls_to_load_buffer;
+        ofThreadChannel<ofYouTubeLoaderEntry> urls_to_load;
 
     private:
 
@@ -66,7 +65,6 @@ class ofxYouTubeURLEvent
     string url;
     int id;
     ofVideoPlayer* vid;
-
-
 };
+
 

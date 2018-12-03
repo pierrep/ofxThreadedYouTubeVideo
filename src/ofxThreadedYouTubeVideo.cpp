@@ -7,9 +7,7 @@ ofxThreadedYouTubeVideo::ofxThreadedYouTubeVideo()
 
 ofxThreadedYouTubeVideo::~ofxThreadedYouTubeVideo()
 {
-    condition.signal();
-
-    // stop threading
+    urls_to_load.close();
     waitForThread(true);
 }
 
@@ -20,10 +18,8 @@ void ofxThreadedYouTubeVideo::loadYouTubeURL(string _url, int _id)
 {
 	ofYouTubeLoaderEntry entry(_url, _id);
 
-    lock();
-	urls_to_load_buffer.push_back(entry);
-    condition.signal();
-    unlock();
+    urls_to_load.send(entry);
+
 }
 
 //------------------------------------------------------------------------------
@@ -47,38 +43,35 @@ const string ofxThreadedYouTubeVideo::genRandomString(const int len) {
 const string ofxThreadedYouTubeVideo::getRandomURL()
 {
     string url = "";
-	const string search_url = "https://gdata.youtube.com/feeds/api/videos?q=\"v="+genRandomString(4)+"\"&alt=json";
-//    cout << "--------------------------------------------------" << endl;
-	//cout << "URL=" << search_url << endl;
+
+    const string search_url = "https://www.googleapis.com/youtube/v3/search?q=\"v="+genRandomString(4)+"\"&key=AIzaSyDGYA7woinSUM_eQStrJWgLaCA5fugJ3IA&part=snippet&maxResults=50&";
+
+    cout << "--------------------------------------------------" << endl;
+    cout << "URL=" << search_url << endl;
 
 	if (!response.open(search_url)) {
 		cout  << "Failed to parse JSON\n" << endl;
 	}
 
-    //cout << response.getRawString(true) << endl;
+    unsigned int numVideos = response["items"].size();
+    unsigned int totalVideos = response["pageInfo"]["totalResults"].asUInt();
+    ofLogNotice("ofxThreadedYouTubeVideo") << "Total videos = " << totalVideos;
+    ofLogNotice("ofxThreadedYouTubeVideo") << "numVideos = " << numVideos;
 
-    string encoding = response["encoding"].asString();
-    //cout << "encoding = " << encoding << endl;
-
-	int numVideos = response["feed"]["entry"].size();
-//	cout << "numVideos = " << numVideos << endl;
+    if(numVideos == 0) {
+        ofLogError("ofxThreadedYouTubeVideo") << "No videos returned";
+        return "";
+    }
 
     int i = ofRandom(0,numVideos);
 
+    Json::Value entryNode = response["items"][i];
 
-    Json::Value entryNode = response["feed"]["entry"][i];
+    cout << "title = " << entryNode["snippet"]["title"].asString() << endl;
+    cout << "video id = " << entryNode["id"]["videoId"].asString() << endl;
+    cout << "--------------------------------------------------" << endl;
 
-    Json::StyledWriter writer;
-   //cout << "JSON output:" << endl;
-    //cout << writer.write(entryNode) << endl;
-
-//    string seconds = entryNode["media$group"]["yt$duration"]["seconds"].asString();
-//    cout << "seconds = " << seconds << endl;
-//    cout << "title = " << entryNode["title"]["$t"].asString() << endl;
-//    cout << "author = " << entryNode["author"][0]["name"]["$t"].asString() << endl;
-//    cout << "link = " << entryNode["link"][0]["href"].asString() << endl;
-//    cout << "--------------------------------------------------" << endl;
-    url = entryNode["link"][0]["href"].asString();
+    url = "https://www.youtube.com/watch?v="+entryNode["id"]["videoId"].asString();
 
     return url;
 }
@@ -118,25 +111,17 @@ bool ofxThreadedYouTubeVideo::getNewURL(ofYouTubeLoaderEntry& entry )
     return true;
 
 }
-// Reads from the queue and loads new images.
-//--------------------------------------------------------------
+
 void ofxThreadedYouTubeVideo::threadedFunction()
 {
-    deque<ofYouTubeLoaderEntry> urls_to_load;
+    setThreadName("ofxThreadedImageLoader " + ofToString(thread.get_id()));
+
+    ofLogVerbose("ofxThreadedImageLoader") << "finishing thread on closed queue";
 
 	while( isThreadRunning() ) {
-		lock();
-		if(urls_to_load_buffer.empty()) condition.wait(mutex);
-		urls_to_load.insert( urls_to_load.end(),
-							urls_to_load_buffer.begin(),
-							urls_to_load_buffer.end() );
 
-		urls_to_load_buffer.clear();
-		unlock();
-
-
-        while( !urls_to_load.empty() ) {
-            ofYouTubeLoaderEntry  & entry = urls_to_load.front();
+       ofYouTubeLoaderEntry entry;
+       while( urls_to_load.receive(entry) ) {
 
             if(!getNewURL(entry)) {
                 ofLogError("ofxThreadedYouTubeVideo") << "couldn't load url: \"" << entry.input_url << "\"";
@@ -147,16 +132,14 @@ void ofxThreadedYouTubeVideo::threadedFunction()
                 cout << "ofxThreadedYouTubeVideo got video url: " << entry.url << endl;
                 ofVideoPlayer* vid = new ofVideoPlayer();
                 vid->setUseTexture(false);
-                vid->loadMovie(entry.url);
+                vid->load(entry.url);
                 ofxYouTubeURLEvent e = ofxYouTubeURLEvent(entry.url, entry.id,vid);
                 ofNotifyEvent(youTubeURLEvent, e, this);
             }
 
-//                lock();
-//                images_to_update.push_back(entry);
-//                unlock();
 
-    		urls_to_load.pop_front();
+
         }
-	}
+
+    } //is thread running
 }
