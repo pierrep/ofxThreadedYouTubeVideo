@@ -82,9 +82,12 @@ bool ofxThreadedYouTubeVideo::getNewURL(ofYouTubeLoaderEntry& entry )
 {
     string new_url = entry.input_url;
 
-    if(new_url == "") {
+   if(new_url == "") {
         new_url = getRandomURL();
-        if(new_url == "") return false;
+        if(new_url == "") {
+			ofLogError("ofxThreadedYouTubeDownloader") << "Empty new URL!";
+			return false;
+		}
     }
 
     string video_url = "youtube-dl -g -f 18 \"" + new_url + "\"";
@@ -114,9 +117,7 @@ bool ofxThreadedYouTubeVideo::getNewURL(ofYouTubeLoaderEntry& entry )
 
 void ofxThreadedYouTubeVideo::threadedFunction()
 {
-    setThreadName("ofxThreadedImageLoader " + ofToString(thread.get_id()));
-
-    ofLogVerbose("ofxThreadedImageLoader") << "finishing thread on closed queue";
+    setThreadName("ofxThreadedYouTubeVideo " + ofToString(thread.get_id()));
 
 	while( isThreadRunning() ) {
 

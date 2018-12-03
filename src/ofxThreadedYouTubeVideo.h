@@ -48,7 +48,6 @@ class ofxThreadedYouTubeVideo : public ofThread
 
         ofxJSONElement  response;
 
-        //deque<ofYouTubeLoaderEntry> urls_to_load_buffer;
         ofThreadChannel<ofYouTubeLoaderEntry> urls_to_load;
 
     private:
